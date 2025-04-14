@@ -2,6 +2,7 @@ from mrjob.job import MRJob
 from mrjob.step import MRStep
 
 import re
+import json
 
 STOPWORDS_PATH = './stopwords.txt'
 
@@ -29,19 +30,30 @@ class Task1(MRJob):
 
         return token_list
 
-    def mapper(self, _, line):
-        # TODO
-        pass
+    def mapper(self, _, line: str):
+        amazon_dict = json.loads(line)
+        category = amazon_dict['category']
+        review_text = amazon_dict['reviewText']
 
+        token_list = self.preprocess(review_text)
 
-    def reducer_count(self, word, counts):
+        for token in token_list:
+            yield (category, token), 1
+
+    def combiner(self, key: tuple[str, str], counts: list[int]):
+        yield key, sum(counts)
+
+    def reducer(self, _, value):
         # TODO
         pass
 
     def steps(self):
         return [
-            MRStep(mapper=self.mapper,
-                   reducer=self.reducer_count)
+            MRStep(
+                mapper=self.mapper,
+                combiner=self.combiner,
+                reducer=self.reducer
+            )
         ]
 
 
