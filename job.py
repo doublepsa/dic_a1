@@ -55,7 +55,7 @@ class Task1(MRJob):
      def combiner(self, key, counts):
     #optimisation
     # sum the keys we've seen so far
-         yield (key, sum(counts))
+         yield key, sum(counts)
 
      def reducer_counter(self, key, counts):
     # sum the all the results for each key
