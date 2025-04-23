@@ -47,7 +47,7 @@ class Task1(MRJob):
             yield ('REVIEW_COUNT', category), 1
         
             # Track total reviews count
-            yield ('TOTAL_REVIEWS', '*'), 1
+            #yield ('TOTAL_REVIEWS', '*'), 1
 
         except:
             self.increment_counter("WARN", "BadJSON", 1)
@@ -70,10 +70,10 @@ class Task1(MRJob):
 
         for key, count in key_count:
             term, cat = key
-            if term == 'TOTAL_REVIEWS':
-                N = count
-            elif term == 'REVIEW_COUNT':
-                category_count[cat] = count
+            #if term == 'TOTAL_REVIEWS':
+              #  N = count
+            if term == 'REVIEW_COUNT':
+                N += count
             elif term == term and cat =='*':
                 term_count[term] = count
             else:
