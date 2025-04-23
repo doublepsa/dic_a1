@@ -86,13 +86,11 @@ class Task1(MRJob):
             A = term_category_count[(term, cat)]
 #how many times does term appear in other categories,we get all the times the term appears in all of the categories, subtract the number of times it appears in category A
             B = term_count[term] - A
-            AplusB = term_count[term]
 #all the terms in the category that are not term
             C = category_count[cat] - A
-            AplusC = category_count[cat]
 #from all the reviews, count of all reviews not in category without term 
             D = N - (A - B - C)
-            chi_square =  (N * (A * D - B * C) ** 2) / ((AplusB) * (AplusC) * (B + D) * (C + D))
+            chi_square =  (N * (A * D - B * C) ** 2) / ((A+B) * (A+C) * (B + D) * (C + D))
             if cat not in chi_square_cat_term:
                 chi_square_cat_term[cat] = {}
             chi_square_cat_term[cat][term] = chi_square
