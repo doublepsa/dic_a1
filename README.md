@@ -27,7 +27,7 @@ scp data/stopwords.txt e{yourStudentID}@lbd.tuwien.ac.at:~/DIC2025_Assignment1/
 
 Development mode (small local dataset)
 ```bash
-.src()/run_job.sh --dev
+./run_job.sh --dev
 ```
 
 Debug flag for timing -> creates a debug{_dev}.txt (can be used with final submission and dev)
