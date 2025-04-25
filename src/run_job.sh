@@ -3,7 +3,7 @@
 # Usage:
 #   ./run_job.sh [--dev] [--debug]
 #     --dev    run locally on reviews_devset.json → output_dev.txt
-#     --debug  write elapsed seconds to debug*.txt (mode‑dependent)
+#     --debug  write elapsed seconds to debug*.txt (mode-dependent)
 
 set -euo pipefail
 
@@ -19,7 +19,7 @@ for arg in "$@"; do
 done
 
 # Build command and filenames
-CMD=(python job.py)
+CMD=(python job.py --files stopwords.txt)
 if $DEV; then
   CMD+=(-r local reviews_devset.json)
   OUT_FILE="output_dev.txt"
@@ -30,6 +30,10 @@ else
   OUT_FILE="output.txt"
   DBG_FILE="debug.txt"
 fi
+
+# remove old files
+rm -f "$OUT_FILE"
+if $DEBUG; then rm -f "$DBG_FILE"; fi
 
 # Run and optionally time
 if $DEBUG; then

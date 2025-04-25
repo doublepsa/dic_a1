@@ -50,7 +50,7 @@ class Task1(MRJob):
         # stopword removal + singel-char removal
         token_list = set([
             token for token in token_list
-            if len(token) < 1 and token not in self.stopword_set
+            if token not in self.stopword_set
         ])
 
         return token_list
@@ -149,7 +149,8 @@ class Task1(MRJob):
         and the second step computes chi-squared statistics based on those aggregates.
         """
         return [
-            MRStep(mapper=self.mapper, combiner=self.combiner, reducer=self.reducer_counter),
+            MRStep(mapper_init=self.mapper_init, mapper=self.mapper, combiner=self.combiner,
+                   reducer=self.reducer_counter),
             MRStep(reducer=self.reducer_chisquare)
         ]
 
