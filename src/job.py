@@ -29,6 +29,10 @@ class Task1(MRJob):
             for line in stopword_file:
                 self.stopword_set.add(line.strip().lower())
 
+        # ensure the stop-word file was actually read
+        if not self.stopword_set:
+            raise RuntimeError("Stopword list is empty or missing")
+
     def preprocess(self, text: str):
         """
         Preprocesses review text to extract meaningful tokens. The text is converted to lowercase,
@@ -43,8 +47,11 @@ class Task1(MRJob):
         tokenization_pattern = r'[ \t\d\(\)\[\]\{\}\.\!\?\,;\:\+\=\-\_\"\'`~#@&*%€$§/]+'
         token_list = re.split(tokenization_pattern, text)
 
-        # stopword removal
-        token_list = set([token for token in token_list if token and token not in self.stopword_set])
+        # stopword removal + singel-char removal
+        token_list = set([
+            token for token in token_list
+            if len(token) < 1 and token not in self.stopword_set
+        ])
 
         return token_list
 
