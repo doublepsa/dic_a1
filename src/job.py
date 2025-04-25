@@ -61,12 +61,12 @@ class Task1(MRJob):
     def mapper(self, _: str, line: str) -> Generator[tuple[tuple[str, str], int], None, None]:
         """
         Loads each input record, parses its JSON, and preprocesses the review text. Emits counts for each term
-        in its category, total term occurrences across all categories (keyed with '*'), and the review count
+        in its category, total term occurrences across all categories (marked with '*'), and the review count
         for each category.
 
-        :param _: the (unused) input key supplied by Hadoop
+        :param _: the unused input key
         :param line: one line of JSON from the Amazon review dataset
-        :return: generator of ((term, category), 1) pairs
+        :return: ((term, category), 1) pairs
         """
         amazon_dict = json.loads(line)
         category: str = amazon_dict['category']
@@ -101,7 +101,7 @@ class Task1(MRJob):
 
         :param key: same key emitted by the combiner
         :param counts: aggregated counts for this key
-        :return: (None, (key, total_count)) for global aggregation -> single reducer in next step
+        :return: (None, (key, total_count)) for single reducer in next step
         """
         yield None, (key, sum(counts))
 
@@ -115,7 +115,7 @@ class Task1(MRJob):
         Identifies the top 75 most discriminative terms per category and outputs them, followed by a
         combined list of all top terms across categories.
 
-        :param _: always ``None`` from previous reducer
+        :param _: always None from previous reducer
         :param key_count: iterator of ((term, category), count) tuples
         :return: strings representing category-specific and global top-term lists
         """
