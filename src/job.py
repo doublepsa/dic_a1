@@ -94,7 +94,7 @@ class Task1(MRJob):
         yield key, sum(counts)
 
     def reducer_counter(self, key: tuple[str, str], counts: Iterable[int]) -> Generator[
-        tuple[None, tuple[tuple[str, str] | str, int]], None, None]:
+        tuple[None, tuple[tuple[str, str], int]], None, None]:
         """
         Sums all counts for each key from the combiners and emits them with a None key so they are
         collected by the final reducer.
