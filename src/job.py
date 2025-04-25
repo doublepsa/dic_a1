@@ -12,18 +12,31 @@ STOPWORDS_PATH = './stopwords.txt'
 
 
 class Task1(MRJob):
+    """
+    Executes Task 1 of Data-Intensive Computing. This job runs in two MRStep stages: the first aggregates all
+    necessary counts, and the second computes the chi-squared statistic for each term in each review category.
+    """
     OUTPUT_PROTOCOL = RawValueProtocol
     stopword_set: set[str] = set()
 
     def mapper_init(self):
-        # load stopwords
+        """
+        Initializes the mapper by loading stopwords from file and converting them to lowercase
+        for later filtering.
+        """
         with open(STOPWORDS_PATH, 'r') as stopword_file:
             self.stopword_set = set()
             for line in stopword_file:
                 self.stopword_set.add(line.strip().lower())
 
     def preprocess(self, text: str):
-        # case folding
+        """
+        Preprocesses review text to extract meaningful tokens. The text is converted to lowercase,
+        split according to punctuation, digits, and whitespace, and then any stopwords are removed.
+
+        :param text: the review text to preprocess
+        :return: a set of filtered tokens
+        """
         text = text.lower()
 
         # tokenization
@@ -36,6 +49,11 @@ class Task1(MRJob):
         return token_list
 
     def mapper(self, _, line: str):
+        """
+        Loads each input record, parses its JSON, and preprocesses the review text. Emits counts for each term
+        in its category, total term occurrences across all categories (keyed with '*'), and the review count
+        for each category.
+        """
         try:
             amazon_dict = json.loads(line)
             category = amazon_dict['category']
@@ -46,7 +64,7 @@ class Task1(MRJob):
             # Count term in category
             for token in token_list:
                 yield (token, category), 1
-                yield (token, '*'), 1  # total term occurrence
+                yield (token, '*'), 1
 
             # Track review count per category
             yield ('REVIEW_COUNT', category), 1
@@ -54,18 +72,25 @@ class Task1(MRJob):
         except Exception:
             self.increment_counter("WARN", "BadJSON", 1)
 
-    # optimisation
     def combiner(self, key, counts):
-        # sum the keys we've seen so far
+        """
+        Aggregates counts locally in each mapper to reduce data transfer before the reducer.
+        """
         yield key, sum(counts)
 
-    # send all (key,count) pairs to the same reducer.
     def reducer_counter(self, key, counts):
-        # sum all the results for each key
+        """
+        Sums all counts for each key from the combiners and emits them with a None key so they are
+        collected by the final reducer.
+        """
         yield None, (key, sum(counts))
 
-    # Since all input to this step has the same key (None), a single reducer task will get all rows
     def reducer_chisquare(self, _, key_count):
+        """
+        Takes all aggregated counts and computes the chi-squared statistic for each term/category pair.
+        Identifies the top 75 most discriminative terms per category and outputs them, followed by a
+        combined list of all top terms across categories.
+        """
         N = 0
         category_count = defaultdict(int)
         term_count = defaultdict(int)
@@ -73,8 +98,6 @@ class Task1(MRJob):
 
         for key, count in key_count:
             term, cat = key
-            # if term == 'TOTAL_REVIEWS':
-            #     N = count
             if term == 'REVIEW_COUNT':
                 N += count
                 category_count[cat] += count
@@ -113,8 +136,11 @@ class Task1(MRJob):
         # output for all top 75 most discriminative terms in each category
         yield None, " ".join(sorted(list(itertools.chain.from_iterable(chi_square_cat_term.values()))))
 
-    # Multi-step jobs as we need to aggregate counts for keys first before we calculate chi_square values
     def steps(self):
+        """
+        Defines the two-step MapReduce workflow: the first step aggregates counts per term and category,
+        and the second step computes chi-squared statistics based on those aggregates.
+        """
         return [
             MRStep(mapper=self.mapper, combiner=self.combiner, reducer=self.reducer_counter),
             MRStep(reducer=self.reducer_chisquare)
