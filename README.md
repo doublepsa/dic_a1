@@ -19,3 +19,23 @@ cd DIC2025_Assignment1
 scp data/reviews_devset.json e{yourStudentID}@lbd.tuwien.ac.at:~/DIC2025_Assignment1/
 scp data/stopwords.txt e{yourStudentID}@lbd.tuwien.ac.at:~/DIC2025_Assignment1/
 ```
+
+### Run
+
+> [!IMPORTANT]  
+> The script ```run_job.sh``` assumes that all the files are within its folder.
+
+Development mode (small local dataset)
+```bash
+.src()/run_job.sh --dev
+```
+
+Debug flag for timing -> creates a debug{_dev}.txt (can be used with final submission and dev)
+```bash
+./run_job.sh --debug
+```
+
+Full Hadoop submission
+```bash
+./run_job.sh
+```
