@@ -9,8 +9,17 @@ from typing import Generator, Any, Tuple
 from pyspark.sql import SparkSession
 
 STOPWORDS_PATH = "./stopwords.txt"
-INPUT = "hdfs:///user/dic25_shared/amazon-reviews/full/reviews_devset.json" # devset
-OUTPUT    = "output_rdd.txt"
+
+DEV = True
+
+if DEV:
+    # dev-dataset
+    INPUT = "hdfs:///user/dic25_shared/amazon-reviews/full/reviews_devset.json"
+    OUTPUT = "output_rdd_dev.txt"
+else:
+    INPUT = "hdfs:///user/dic25_shared/amazon-reviews/full/reviewscombined.json"
+    OUTPUT = "output_rdd.txt"
+
 
 def load_stopwords(path: str) -> set[str]:
     """
@@ -29,12 +38,14 @@ def load_stopwords(path: str) -> set[str]:
         raise RuntimeError("Stopword list is empty or missing")
     return stopword_set
 
+
 def preprocess(text: str, stopwords: set[str]) -> set[str]:
     """
     Preprocesses review text to extract meaningful tokens. The text is converted to lowercase,
     split according to punctuation, digits, and whitespace, and then any stopwords are removed.
 
     :param text: the review text to preprocess
+    :param stopwords: the set of stopwords
     :return: a set of filtered tokens
     """
     text = text.lower()
@@ -54,8 +65,7 @@ def preprocess(text: str, stopwords: set[str]) -> set[str]:
 
 def extract_term_counts(
         record: Any,
-        stopwords) -> Generator[Tuple[Tuple[str,str], int], None, None]:
-
+        stopwords) -> Generator[Tuple[Tuple[str, str], int], None, None]:
     """
     For each review, yield the three kinds of count events we need:
       - (term, category)
@@ -106,7 +116,7 @@ def main():
             term_count[term] = cnt
         else:
             term_category_count[(term, cat)] = cnt
-    
+
     # calculating chi2 of all terms for each category
     chi2_per_cat = defaultdict(dict)
     for (term, cat), A in term_category_count.items():
@@ -116,7 +126,7 @@ def main():
         denom = (A + B) * (A + C) * (B + D) * (C + D)
         if denom <= 0:
             continue
-        chi2 = (N * (A*D - B*C)**2) / denom
+        chi2 = (N * (A * D - B * C) ** 2) / denom
         chi2_per_cat[cat][term] = chi2
 
     # the top 75 most discriminative terms for the category according to the chi-square test in descending order
@@ -131,11 +141,11 @@ def main():
     for cat, terms in top75_per_cat.items():
         terms_line = f"{cat} " + " ".join(f"{term}:{chi2_per_cat[cat][term]}" for term, _ in terms)
         out_lines.append(terms_line)
-        
+
     # combined global list (just the sorted terms)
     all_terms = sorted(
         itertools.chain.from_iterable(
-            [ [t for t,_ in terms] for _, terms in top75_per_cat.items() ]
+            [[t for t, _ in terms] for _, terms in top75_per_cat.items()]
         )
     )
     out_lines.append("GLOBAL " + " ".join(all_terms))
@@ -143,6 +153,7 @@ def main():
     sc.parallelize(out_lines, 1).saveAsTextFile(OUTPUT)
 
     spark.stop()
+
 
 if __name__ == "__main__":
     main()
