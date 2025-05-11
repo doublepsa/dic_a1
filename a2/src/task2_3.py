@@ -16,7 +16,7 @@ from pyspark.ml.evaluation import MulticlassClassificationEvaluator
 from pyspark.ml.tuning import ParamGridBuilder, TrainValidationSplit
 
 STOPWORDS_PATH = "./stopwords.txt"
-SEED = 11924605
+SEED = 11924
 
 DEV = True
 
@@ -124,7 +124,6 @@ def main():
     base_svc = LinearSVC(
         featuresCol="normalizedFeatures",
         labelCol="label",
-        seed=SEED
     )
 
     # for multiclass calssification we chose the one vs rest strategy
@@ -147,10 +146,10 @@ def main():
 
     # define the grid for grid search
     param_grid = (ParamGridBuilder()
-                  .addGrid(clf_pipeline.stages[5].numTopFeatures, [2000, 500])
-                  .addGrid(one_vs_rest.classifier.regParam, [0.01, 0.1, 1.0])
-                  .addGrid(one_vs_rest.classifier.standardization, [True, False])
-                  .addGrid(one_vs_rest.classifier.maxIter, [50, 100])
+                  .addGrid(chi_sq_selector.numTopFeatures, [2000, 500])
+                  .addGrid(base_svc.regParam, [0.01, 0.1, 1.0])
+                  .addGrid(base_svc.standardization, [True, False])
+                  .addGrid(base_svc.maxIter, [50, 100])
                   .build()
                   )
 
