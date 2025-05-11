@@ -48,10 +48,15 @@ def main():
     with open(STOPWORDS_PATH, "r") as stopword_file:
         stopwords = [word.strip().lower() for word in stopword_file if word.strip()]
 
+    # stop_word_remover = StopWordsRemover(
+    #     inputCol="tokens",
+    #     outputCol="filteredTokens",
+    #     stopwords=stopwords
+    # )
+
     stop_word_remover = StopWordsRemover(
         inputCol="tokens",
-        outputCol="filteredTokens",
-        stopwords=stopwords
+        outputCol="filteredTokens"
     )
 
     count_vectorizer = CountVectorizer(
