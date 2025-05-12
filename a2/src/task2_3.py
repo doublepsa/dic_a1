@@ -30,7 +30,7 @@ else:
 
 
 def main():
-    spark = SparkSession.builder.appName("Task2_DS_Pipeline").getOrCreate()
+    spark = SparkSession.builder.appName("Task2_3").getOrCreate()
     #   spark.sparkContext.setLogLevel("ERROR")
     sc = spark.sparkContext
 
@@ -48,11 +48,11 @@ def main():
     with open(STOPWORDS_PATH, "r") as stopword_file:
         stopwords = [word.strip().lower() for word in stopword_file if word.strip()]
 
-    # stop_word_remover = StopWordsRemover(
-    #     inputCol="tokens",
-    #     outputCol="filteredTokens",
-    #     stopwords=stopwords
-    # )
+    #stop_word_remover = StopWordsRemover(
+    #    inputCol="tokens",
+    #    outputCol="filteredTokens",
+    #    stopwords=stopwords
+    #)
 
     stop_word_remover = StopWordsRemover(
         inputCol="tokens",
@@ -105,11 +105,14 @@ def main():
     selected_terms = sorted([vocab[i] for i in selected_indices])
 
     # save the file output_ds.txt
-    with open(OUTPUT, "w", encoding="utf-8") as f:
-        for term in selected_terms:
-            f.write(term + "\n")
+    rdd = sc.parallelize(selected_terms, 1)
+    rdd.saveAsTextFile(OUTPUT)
+
 
     # Task 3
+
+    if DEV:
+        df = df.sample(withReplacement=False, fraction=0.20, seed=SEED)
 
     # split into test and train/val
     train_val_df, test_df = df.randomSplit([0.8, 0.2], seed=SEED)
@@ -123,7 +126,7 @@ def main():
 
     base_svc = LinearSVC(
         featuresCol="normalizedFeatures",
-        labelCol="label",
+        labelCol="label"
     )
 
     # for multiclass calssification we chose the one vs rest strategy
