@@ -148,7 +148,7 @@ def main():
             [[t for t, _ in terms] for _, terms in top75_per_cat.items()]
         )
     )
-    out_lines.append("GLOBAL " + " ".join(all_terms))
+    out_lines.append(" ".join(all_terms))
 
     sc.parallelize(out_lines, 1).saveAsTextFile(OUTPUT)
 
