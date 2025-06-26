@@ -1,5 +1,6 @@
 import json
 import os
+import string
 import typing
 from urllib.parse import unquote_plus
 
@@ -9,9 +10,10 @@ if typing.TYPE_CHECKING:
     from mypy_boto3_s3 import S3Client
     from mypy_boto3_ssm import SSMClient
 
+# LocalStack endpoint in “local” stage
 endpoint_url = None
 if os.getenv("STAGE") == "local":
-    endpoint_url = "https://localhost.localstack.cloud:4566"
+    endpoint_url = "http://localhost.localstack.cloud:4566"
 
 s3: "S3Client" = boto3.client("s3", endpoint_url=endpoint_url)
 ssm: "SSMClient" = boto3.client("ssm", endpoint_url=endpoint_url)
@@ -22,43 +24,40 @@ def get_processed_bucket_name() -> str:
     return parameter["Parameter"]["Value"]
 
 
-def preprocess_review(review_data):
-    summary = review_data.get("summary", "")
-    review_text = review_data.get("reviewText", "")
-    overall = review_data.get("overall", "")
+def basic_clean(text: str) -> str:
+    text = text.lower()
+    text = text.translate(str.maketrans("", "", string.punctuation))
+    words = [w for w in text.split() if len(w) > 2]
+    return " ".join(words)
 
-    # Basic cleaning for now
-    processed = {
-        "summary": summary.strip(),
-        "reviewText": review_text.strip(),
-        "overall": str(overall).strip(),
-        "reviewerID": review_data.get("reviewerID", ""),
-        "asin": review_data.get("asin", ""),
-        "unixReviewTime": review_data.get("unixReviewTime", "")
+
+def preprocess_review(review):
+    return {
+        "summary": basic_clean(review.get("summary", "")),
+        "reviewText": basic_clean(review.get("reviewText", "")),
+        "overall": str(review.get("overall", "")),
+        "reviewerID": review.get("reviewerID", ""),
+        "asin": review.get("asin", ""),
+        "unixReviewTime": review.get("unixReviewTime", "")
     }
 
-    return processed
 
-
-def handler(event, context):
+def handler(event, _context):
     processed_bucket = get_processed_bucket_name()
 
-    for record in event["Records"]:
-        source_bucket = record["s3"]["bucket"]["name"]
-        key = unquote_plus(record["s3"]["object"]["key"])
-        print(f"Processing {source_bucket}/{key}")
+    for rec in event["Records"]:
+        src_bucket = rec["s3"]["bucket"]["name"]
+        key = unquote_plus(rec["s3"]["object"]["key"])
 
-        response = s3.get_object(Bucket=source_bucket, Key=key)
-        review_data = json.loads(response['Body'].read().decode('utf-8'))
-
-        processed_review = preprocess_review(review_data)
+        obj = s3.get_object(Bucket=src_bucket, Key=key)
+        clean = preprocess_review(json.loads(obj["Body"].read()))
 
         processed_key = f"processed_{key}"
         s3.put_object(
             Bucket=processed_bucket,
             Key=processed_key,
-            Body=json.dumps(processed_review),
-            ContentType='application/json'
+            Body=json.dumps(clean),
+            ContentType="application/json"
         )
 
-        print(f"Processed review saved to {processed_bucket}/{processed_key}")
+    return {"status": "ok", "processed": len(event["Records"])}

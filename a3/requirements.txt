@@ -11,3 +11,4 @@ pytest==8.3.5
 awscli-local==0.22.0
 localstack==4.4.0
 awscli
+tqdm
