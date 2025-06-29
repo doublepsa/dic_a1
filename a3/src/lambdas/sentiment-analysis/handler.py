@@ -2,9 +2,11 @@ import json, os
 from urllib.parse import unquote_plus
 
 import boto3
+import nltk
+from nltk.sentiment import SentimentIntensityAnalyzer
 
-ENDP = "http://localhost.localstack.cloud:4566" \
-       if os.getenv("STAGE") == "local" else None
+# local-stack endpoint
+ENDP = "http://localhost.localstack.cloud:4566" if os.getenv("STAGE") == "local" else None
 
 s3   = boto3.client("s3",  endpoint_url=ENDP)
 ssm  = boto3.client("ssm", endpoint_url=ENDP)
@@ -18,20 +20,17 @@ stats_table = dyna.Table(
     ssm.get_parameter(Name="/review-app/tables/sentiments")["Parameter"]["Value"]
 )
 
-POS = {"good", "great", "excellent", "love", "amazing", "perfect", "best"}
-NEG = {"bad", "terrible", "awful", "hate", "worst", "poor", "boring"}
-
+# make sure VADER can find its lexicon inside the layer/zip
+nltk.data.path.append(os.path.join(os.path.dirname(__file__), "nltk_data"))
+VADER = SentimentIntensityAnalyzer()
 
 def label(text: str) -> str:
-    words = text.lower().split()
-    pos = sum(1 for w in words if w in POS)
-    neg = sum(1 for w in words if w in NEG)
-    if pos > neg:
+    score = VADER.polarity_scores(text)["compound"]
+    if score >= 0.05:
         return "positive"
-    if neg > pos:
+    if score <= -0.05:
         return "negative"
     return "neutral"
-
 
 def handler(event, _ctx):
     for rec in event["Records"]:
@@ -50,10 +49,9 @@ def handler(event, _ctx):
             ExpressionAttributeValues={":c": 1}
         )
 
-        sentiment_key = f"sentiment_{key}"
         s3.put_object(
             Bucket=sentiment_bucket,
-            Key=sentiment_key,
+            Key=f"sentiment_{key}",
             Body=json.dumps(data),
             ContentType="application/json"
         )

@@ -1,7 +1,10 @@
 import json, os
 from urllib.parse import unquote_plus
 
+from better_profanity import profanity
 import boto3
+
+profanity.load_censor_words()  # loads default English word-list
 
 ENDP = "http://localhost.localstack.cloud:4566" \
     if os.getenv("STAGE") == "local" else None
@@ -10,9 +13,6 @@ s3 = boto3.client("s3", endpoint_url=ENDP)
 ssm = boto3.client("ssm", endpoint_url=ENDP)
 dyna = boto3.resource("dynamodb", endpoint_url=ENDP)
 
-BAD_WORDS = {"idiot", "stupid", "ugly"}
-
-# Destination bucket and Dynamo table names via SSM
 profanity_bucket = ssm.get_parameter(
     Name="/review-app/buckets/profanity"
 )["Parameter"]["Value"]
@@ -34,9 +34,11 @@ def handler(event, _ctx):
 
         obj = s3.get_object(Bucket=src_bucket, Key=key)
         data = json.loads(obj["Body"].read())
-        text = f"{data.get('summary', '')} {data.get('reviewText', '')}"
 
-        rude = contains_bad_words(text)
+        tokens = data.get("summary_tokens", []) + data.get("reviewText_tokens", [])
+        joined = " ".join(tokens) or f"{data.get('summary', '')} {data.get('reviewText', '')}"
+
+        rude = profanity.contains_profanity(joined)
 
         reviewer = data.get("reviewerID", "unknown")
         upd = customer_table.update_item(
@@ -56,10 +58,9 @@ def handler(event, _ctx):
         data["containsBadWords"] = rude
         data["bannedAfterThis"] = banned
 
-        profanity_key = f"profanity_{key}"
         s3.put_object(
             Bucket=profanity_bucket,
-            Key=profanity_key,
+            Key=f"profanity_{key}",
             Body=json.dumps(data),
             ContentType="application/json"
         )

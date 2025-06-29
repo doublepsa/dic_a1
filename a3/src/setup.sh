@@ -29,12 +29,18 @@ awslocal dynamodb create-table \
   --key-schema AttributeName=sentiment,KeyType=HASH \
   --billing-mode PAY_PER_REQUEST || true
 
-awslocal ssm put-parameter --name "/review-app/tables/customers" --value "customers" --type String --overwrite
+awslocal ssm put-parameter --name "/review-app/tables/customers"  --value "customers"  --type String --overwrite
 awslocal ssm put-parameter --name "/review-app/tables/sentiments" --value "sentiments" --type String --overwrite
 
 # Deploy preprocess lambda
 cd "$LAMBDA_DIR/preprocess"
-zip -qr preprocess.zip handler.py
+rm -rf package preprocess.zip
+mkdir package
+pip install -r requirements.txt -t package --platform manylinux2014_x86_64 --only-binary=:all:
+python -m nltk.downloader stopwords wordnet -d package/nltk_data
+zip preprocess.zip handler.py
+cd package
+zip -r ../preprocess.zip *
 cd - >/dev/null
 awslocal lambda create-function \
   --function-name preprocess \
@@ -43,19 +49,27 @@ awslocal lambda create-function \
   --handler handler.handler \
   --zip-file "fileb://$LAMBDA_DIR/preprocess/preprocess.zip" \
   --environment Variables='{STAGE=local}' \
+  --timeout 15 \
 || awslocal lambda update-function-code \
      --function-name preprocess \
      --zip-file "fileb://$LAMBDA_DIR/preprocess/preprocess.zip"
 
 # Deploy profanity-check lambda
 cd "$LAMBDA_DIR/profanity-check"
-zip -qr profanity-check.zip handler.py
+rm -rf package profanity-check.zip
+mkdir package
+pip install -r requirements.txt -t package --platform manylinux2014_x86_64 --only-binary=:all:
+zip profanity-check.zip handler.py
+cd package
+zip -r ../profanity-check.zip *
 cd - >/dev/null
 awslocal lambda create-function \
   --function-name profanity-check \
   --runtime python3.11 \
   --role arn:aws:iam::000000000000:role/lambda-role \
   --handler handler.handler \
+  --memory-size 512 \
+  --timeout 30 \
   --zip-file "fileb://$LAMBDA_DIR/profanity-check/profanity-check.zip" \
   --environment Variables='{STAGE=local}' \
 || awslocal lambda update-function-code \
@@ -63,14 +77,23 @@ awslocal lambda create-function \
      --zip-file "fileb://$LAMBDA_DIR/profanity-check/profanity-check.zip"
 
 # Deploy sentiment-analysis lambda
+# Deploy sentiment-analysis lambda
 cd "$LAMBDA_DIR/sentiment-analysis"
-zip -qr sentiment-analysis.zip handler.py
+rm -rf package sentiment-analysis.zip
+mkdir package
+pip install -r requirements.txt -t package --platform manylinux2014_x86_64 --only-binary=:all:
+python -m nltk.downloader vader_lexicon -d package/nltk_data
+zip sentiment-analysis.zip handler.py
+cd package
+zip -r ../sentiment-analysis.zip *
 cd - >/dev/null
 awslocal lambda create-function \
   --function-name sentiment-analysis \
   --runtime python3.11 \
   --role arn:aws:iam::000000000000:role/lambda-role \
   --handler handler.handler \
+  --memory-size 512 \
+  --timeout 30 \
   --zip-file "fileb://$LAMBDA_DIR/sentiment-analysis/sentiment-analysis.zip" \
   --environment Variables='{STAGE=local}' \
 || awslocal lambda update-function-code \

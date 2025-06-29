@@ -2,9 +2,18 @@ import json
 import os
 import string
 import typing
+import pathlib
 from urllib.parse import unquote_plus
-
+import traceback
 import boto3
+import nltk
+from nltk.corpus import stopwords
+from nltk.tokenize import wordpunct_tokenize
+from nltk.stem import WordNetLemmatizer
+
+nltk.data.path.append(
+    str(pathlib.Path(__file__).parent / "nltk_data")
+)
 
 if typing.TYPE_CHECKING:
     from mypy_boto3_s3 import S3Client
@@ -18,6 +27,8 @@ if os.getenv("STAGE") == "local":
 s3: "S3Client" = boto3.client("s3", endpoint_url=endpoint_url)
 ssm: "SSMClient" = boto3.client("ssm", endpoint_url=endpoint_url)
 
+stop_words = set(stopwords.words("english"))
+lemmatizer  = WordNetLemmatizer()
 
 def get_processed_bucket_name() -> str:
     parameter = ssm.get_parameter(Name="/review-app/buckets/processed")
@@ -27,9 +38,9 @@ def get_processed_bucket_name() -> str:
 def basic_clean(text: str) -> str:
     text = text.lower()
     text = text.translate(str.maketrans("", "", string.punctuation))
-    words = [w for w in text.split() if len(w) > 2]
-    return " ".join(words)
-
+    tokens  = [w for w in wordpunct_tokenize(text) if w.isalpha() and w not in stop_words]
+    lemmas  = [lemmatizer.lemmatize(tok) for tok in tokens]
+    return " ".join(lemmas)
 
 def preprocess_review(review):
     return {
@@ -41,7 +52,6 @@ def preprocess_review(review):
         "unixReviewTime": review.get("unixReviewTime", "")
     }
 
-
 def handler(event, _context):
     processed_bucket = get_processed_bucket_name()
 
@@ -51,11 +61,9 @@ def handler(event, _context):
 
         obj = s3.get_object(Bucket=src_bucket, Key=key)
         clean = preprocess_review(json.loads(obj["Body"].read()))
-
-        processed_key = f"processed_{key}"
         s3.put_object(
             Bucket=processed_bucket,
-            Key=processed_key,
+            Key=f"processed_{key}",
             Body=json.dumps(clean),
             ContentType="application/json"
         )

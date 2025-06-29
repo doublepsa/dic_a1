@@ -15,7 +15,8 @@ dyna = boto3.resource("dynamodb", endpoint_url=ENDPOINT)
 
 
 def param(name: str) -> str:
-    return ssm.get_parameter(Name=name)["Parameter"]["Value"]
+    parameter = ssm.get_parameter(Name=name)
+    return parameter["Parameter"]["Value"]
 
 
 def load_reviews(file_path: str):
@@ -38,6 +39,8 @@ def upload_one_by_one(reviews, bucket):
             Body=json.dumps(rev),
             ContentType="application/json",
         )
+        time.sleep(0.25)
+
     print("Upload complete.\n")
 
 
