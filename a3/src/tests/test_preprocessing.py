@@ -30,11 +30,10 @@ def load_reviews(file_path: str):
     return reviews[:UPLOAD_LIMIT]
 
 
-
 def upload_one_by_one(reviews: list[str], bucket):
     print(f"Uploading {len(reviews)} reviews to {bucket}")
 
-    for idx, rev in tqdm(enumerate(reviews), total=min(200, len(reviews)), desc="Uploading"):
+    for idx, rev in tqdm(enumerate(reviews), desc="Uploading"):
         key = f"review_{idx:04d}_{rev.get('reviewerID', 'unknown')}.json"
         s3.put_object(
             Bucket=bucket,
