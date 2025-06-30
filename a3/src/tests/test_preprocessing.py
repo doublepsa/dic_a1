@@ -7,11 +7,12 @@ os.environ["AWS_ACCESS_KEY_ID"] = "test"
 os.environ["AWS_SECRET_ACCESS_KEY"] = "test"
 os.environ["AWS_DEFAULT_REGION"] = "us-east-1"
 
-ENDPOINT = "http://localhost.localstack.cloud:4566"
+ENDPOINT_URL = "http://localhost.localstack.cloud:4566"
+UPLOAD_LIMIT = 2000
 
-s3 = boto3.client("s3", endpoint_url=ENDPOINT)
-ssm = boto3.client("ssm", endpoint_url=ENDPOINT)
-dyna = boto3.resource("dynamodb", endpoint_url=ENDPOINT)
+s3 = boto3.client("s3", endpoint_url=ENDPOINT_URL)
+ssm = boto3.client("ssm", endpoint_url=ENDPOINT_URL)
+dyna = boto3.resource("dynamodb", endpoint_url=ENDPOINT_URL)
 
 
 def param(name: str) -> str:
@@ -26,13 +27,15 @@ def load_reviews(file_path: str):
             line = line.strip()
             if line:
                 reviews.append(json.loads(line))
-    return reviews
+    return reviews[:UPLOAD_LIMIT]
 
 
-def upload_one_by_one(reviews, bucket):
-    print(f"Uploading {len(reviews)} reviews → {bucket}")
-    for idx, rev in enumerate(reviews):
-        key = f"review_{idx:04d}_{rev.get('reviewerID', 'na')}.json"
+
+def upload_one_by_one(reviews: list[str], bucket):
+    print(f"Uploading {len(reviews)} reviews to {bucket}")
+
+    for idx, rev in tqdm(enumerate(reviews), total=min(200, len(reviews)), desc="Uploading"):
+        key = f"review_{idx:04d}_{rev.get('reviewerID', 'unknown')}.json"
         s3.put_object(
             Bucket=bucket,
             Key=key,
@@ -41,18 +44,17 @@ def upload_one_by_one(reviews, bucket):
         )
         time.sleep(0.25)
 
-    print("Upload complete.\n")
+    print("Upload complete\n")
 
 
 def wait_for_processing(expected, table_name):
     table = dyna.Table(table_name)
-    for _ in range(60):
+    while True:
         scan = table.scan(ProjectionExpression="cnt")
         total = sum(int(item["cnt"]) for item in scan.get("Items", []))
         if total >= expected:
             return
         time.sleep(1)
-    print("⚠  Timeout: pipeline did not finish in 60 s", file=sys.stderr)
 
 
 if __name__ == "__main__":
@@ -66,7 +68,7 @@ if __name__ == "__main__":
 
     upload_one_by_one(reviews, input_bucket)
 
-    print("Waiting for Lambdas to finish …")
+    print("Waiting for Lambdas to finish")
     wait_for_processing(len(reviews), sentiments_tb)
 
     sentiments_table = dyna.Table(sentiments_tb)
@@ -77,25 +79,19 @@ if __name__ == "__main__":
         sentiment_counts[item["sentiment"]] = int(item["cnt"])
 
     customers_table = dyna.Table(customers_tb)
-    cust_scan = customers_table.scan()
+    customers_scan = customers_table.scan()
 
     unpolite_total = 0
     banned_users = []
-    for item in cust_scan.get("Items", []):
+    for item in customers_scan.get("Items", []):
         unpolite_total += int(item.get("unpolite_count", 0))
         if item.get("banned") is True:
             banned_users.append(item["reviewerID"])
 
-    print(f"Sentiment distribution (devset only):")
-    print(f"  positive: {sentiment_counts['positive']}")
-    print(f"  neutral : {sentiment_counts['neutral']}")
-    print(f"  negative: {sentiment_counts['negative']}\n")
+    print(f"positive: {sentiment_counts['positive']}")
+    print(f"neutral : {sentiment_counts['neutral']}")
+    print(f"negative: {sentiment_counts['negative']}\n")
 
-    print(f"Total reviews that failed profanity check: {unpolite_total}\n")
+    print(f"Users with swearwords in reviews: {unpolite_total}\n")
 
-    if banned_users:
-        print("Banned users:")
-        for u in banned_users:
-            print(f"  • {u}")
-    else:
-        print("No users were banned.")
+    print(f"Banned users: {len(banned_users)}")

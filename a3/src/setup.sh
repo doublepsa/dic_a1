@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+
+# This scripts fails on error but for specific commands we want to ignore errors
+# we use '|| true' to ignore the error
 set -e
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
@@ -50,9 +53,7 @@ awslocal lambda create-function \
   --zip-file "fileb://$LAMBDA_DIR/preprocess/preprocess.zip" \
   --environment Variables='{STAGE=local}' \
   --timeout 15 \
-|| awslocal lambda update-function-code \
-     --function-name preprocess \
-     --zip-file "fileb://$LAMBDA_DIR/preprocess/preprocess.zip"
+|| true
 
 # Deploy profanity-check lambda
 cd "$LAMBDA_DIR/profanity-check"
@@ -72,11 +73,8 @@ awslocal lambda create-function \
   --timeout 30 \
   --zip-file "fileb://$LAMBDA_DIR/profanity-check/profanity-check.zip" \
   --environment Variables='{STAGE=local}' \
-|| awslocal lambda update-function-code \
-     --function-name profanity-check \
-     --zip-file "fileb://$LAMBDA_DIR/profanity-check/profanity-check.zip"
+|| true
 
-# Deploy sentiment-analysis lambda
 # Deploy sentiment-analysis lambda
 cd "$LAMBDA_DIR/sentiment-analysis"
 rm -rf package sentiment-analysis.zip
@@ -96,14 +94,29 @@ awslocal lambda create-function \
   --timeout 30 \
   --zip-file "fileb://$LAMBDA_DIR/sentiment-analysis/sentiment-analysis.zip" \
   --environment Variables='{STAGE=local}' \
-|| awslocal lambda update-function-code \
-     --function-name sentiment-analysis \
-     --zip-file "fileb://$LAMBDA_DIR/sentiment-analysis/sentiment-analysis.zip"
+|| true
 
 # Add lambda permissions
-awslocal lambda add-permission --function-name preprocess --statement-id s3invoke1 --action lambda:InvokeFunction --principal s3.amazonaws.com --source-arn arn:aws:s3:::reviews-input || true
-awslocal lambda add-permission --function-name profanity-check --statement-id s3invoke2 --action lambda:InvokeFunction --principal s3.amazonaws.com --source-arn arn:aws:s3:::reviews-processed || true
-awslocal lambda add-permission --function-name sentiment-analysis --statement-id s3invoke3 --action lambda:InvokeFunction --principal s3.amazonaws.com --source-arn arn:aws:s3:::reviews-profanity || true
+awslocal lambda add-permission \
+  --function-name preprocess \
+  --statement-id s3invoke1 \
+  --action lambda:InvokeFunction \
+  --principal s3.amazonaws.com \
+  --source-arn arn:aws:s3:::reviews-input || true
+
+awslocal lambda add-permission \
+  --function-name profanity-check \
+  --statement-id s3invoke2 \
+  --action lambda:InvokeFunction \
+  --principal s3.amazonaws.com \
+  --source-arn arn:aws:s3:::reviews-processed || true
+
+awslocal lambda add-permission \
+  --function-name sentiment-analysis \
+  --statement-id s3invoke3 \
+  --action lambda:InvokeFunction \
+  --principal s3.amazonaws.com \
+  --source-arn arn:aws:s3:::reviews-profanity || true
 
 # Configure S3 bucket notifications
 awslocal s3api put-bucket-notification-configuration \
@@ -142,4 +155,4 @@ awslocal s3api put-bucket-notification-configuration \
     ]
   }'
 
-echo "✔ LocalStack resources ready."
+echo "LocalStack ready"
