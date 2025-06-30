@@ -91,7 +91,7 @@ awslocal lambda create-function \
   --role arn:aws:iam::000000000000:role/lambda-role \
   --handler handler.handler \
   --memory-size 512 \
-  --timeout 30 \
+  --timeout 60 \
   --zip-file "fileb://$LAMBDA_DIR/sentiment-analysis/sentiment-analysis.zip" \
   --environment Variables='{STAGE=local}' \
 || true

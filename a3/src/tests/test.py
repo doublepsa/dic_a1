@@ -8,7 +8,7 @@ os.environ["AWS_SECRET_ACCESS_KEY"] = "test"
 os.environ["AWS_DEFAULT_REGION"] = "us-east-1"
 
 ENDPOINT_URL = "http://localhost.localstack.cloud:4566"
-UPLOAD_LIMIT = 2000
+UPLOAD_LIMIT = 400
 
 s3 = boto3.client("s3", endpoint_url=ENDPOINT_URL)
 ssm = boto3.client("ssm", endpoint_url=ENDPOINT_URL)
@@ -41,7 +41,7 @@ def upload_one_by_one(reviews: list[str], bucket):
             Body=json.dumps(rev),
             ContentType="application/json",
         )
-        time.sleep(0.25)
+        time.sleep(0.1)
 
     print("Upload complete\n")
 
